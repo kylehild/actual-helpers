@@ -55,7 +55,7 @@ async function getBitcoinPrice() {
     const btc_amount = note.split('BTC:')[1].split(' ')[0];
     const currentBalance = await getAccountBalance(account);
     const targetBalance = Math.round(bitcoinPrice * btc_amount * 100);
-    const diff = currentBalance - targetBalance;
+    const diff = targetBalance - currentBalance;
     if (diff != 0) {
       await api.importTransactions(account.id, [{
         date: new Date(),
