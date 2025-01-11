@@ -64,7 +64,13 @@ const getSimplefinBalances = async () => {
 
 const shouldDrop = (payment) => {
   const note = payment.notes;
-  return note && (note.indexOf('YOU BOUGHT ') > -1 || note == 'Buy Other' || note == 'Sell Other');
+  return note && (
+    note.indexOf('YOU BOUGHT ') > -1 
+    || note.indexOf('DIVIDEND ') > -1 
+    || note.indexOf('REINVESTMENT ') > -1 
+    || note == 'Buy Other'
+    || note == 'Sell Other'
+  );
 };
 
 const zeroTransaction = async (payment) => {
@@ -95,7 +101,7 @@ const zeroTransaction = async (payment) => {
         const data = await getTransactions(account);
 
         if (note.indexOf('zeroSmall') > -1) {
-          const payments = data.filter(payment => payment.amount > -10000 && payment.amount < 10000 && payment.amount != 0 && payment.category == categoryId)
+          const payments = data.filter(payment => payment.amount > -10000 && payment.amount < 10000 && payment.amount != 0 && payment.payee == payeeId)
           for (const payment of payments) {
             if (shouldDrop(payment)) {
               await zeroTransaction(payment);
