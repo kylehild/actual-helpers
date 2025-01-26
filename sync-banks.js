@@ -7,7 +7,12 @@ const api = require('@actual-app/api');
   await openBudget();
 
   console.log("syncing banks...");
-  await api.runBankSync();
-
+  try {
+    await api.runBankSync();
+  }
+  catch (error) {
+    console.log(error);
+  }
+  
   await closeBudget();
 })();
