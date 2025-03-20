@@ -48,7 +48,9 @@ async function getBitcoinPrice() {
     if (account.closed) {
       continue;
     }
-    const note = await getAccountNote(account);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() + 1);
+    const note = await getAccountNote(account, cutoffDate);
     if (!note || note.indexOf("BTC:") === -1) {
       continue;
     }
