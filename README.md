@@ -47,7 +47,7 @@ ACTUAL_CACHE_DIR="./cache"
 # optional, name of the payee for added interest transactions
 INTEREST_PAYEE_NAME="Loan Interest"
 
-# optional, name of the payee for added interest transactions
+# optional, name of the payee for added investment transactions
 INVESTMENT_PAYEE_NAME="Investment"
 # optional, name of the category group for added investment tracking transactions
 INVESTMENT_CATEGORY_GROUP_NAME="Income"
@@ -71,6 +71,23 @@ BITCOIN_PAYEE_NAME="Bitcoin Price Change"
 RENTCAST_API_KEY="<Rentcast API key>"
 RENTCAST_PAYEE_NAME="RentCast"
 ```
+
+### OIDC Auth Provider Support
+
+When using OIDC, in your Actual Budget server config you must be able to log in
+with a password.
+
+Set the following in your **server config** (not in your helpers config!), then
+on initial login you must set a password:
+
+```
+ACTUAL_OPENID_AUTH_METHOD=openid
+ACTUAL_LOGIN_METHOD=openid
+ACTUAL_ALLOWED_LOGIN_METHODS=openid,password,header
+ACTUAL_OPENID_ENFORCE=false
+```
+
+Then configure the helpers for password login, as shown above.
 
 ## Installation
 
@@ -390,3 +407,43 @@ node sync-bitcoin.js
 ```
 
 It is recommended to run this script once per day or week.
+
+### Tracking Crypto Prices
+
+This script tracks the value of any cryptocurrency. Similar to the Bitcoin
+script, it adds new transactions to keep the account balance equal to the
+latest value. Values are retrieved from the Kraken API, but the script is
+customizable to use other APIs if needed.
+
+To use, set these tags in the account notes:
+
+- `CRYPTO:<symbol>,<symbol>,...` - where each symbol is a cryptocurrency
+  you want to track, e.g. `CRYPTO:BTC,ETH,DOGE`
+- `<symbol>:<amount>[,<krakenPair>]` - where `<symbol>` is the cryptocurrency
+  symbol and `<amount>` is the amount you own. If using Kraken, specify the Kraken
+  pair to use for the price. Obtain this by visiting
+  [https://api.kraken.com/0/public/Ticker?pair=<symbol\>usd](https://api.kraken.com/0/public/Ticker?pair=btcusd)
+  and locating the key under `result` that matches your symbol.
+
+For example, if you own 0.01 BTC and 1 ETH, your account note would look like:
+```
+CRYPTO:BTC,ETH
+BTC:0.01,XXBTZUSD
+ETH:1,XXETHZUSD
+```
+
+To use a different API, set the following in your `.env` file: (example using Bitcoin)
+```shell
+CRYPTO_PRICE_URL_BTC="https://api.kraken.com/0/public/Ticker?pair=xbtgbp"
+CRYPTO_PRICE_JSON_PATH_BTC="result.XXBTZGBP.c[0]"
+```
+
+To run:
+
+```console
+node sync-crypto.js
+```
+
+It is recommended to run this script once per day or week. If you are retrieving
+BTC prices using this script, DO NOT run the `sync-bitcoin.js` script as well, as it will
+set the account balance to the value of your BTC holdings only.
