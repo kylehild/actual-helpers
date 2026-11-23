@@ -11,10 +11,15 @@ This is a collection of useful scripts to help you manage your Actual Budget.
     - [Sync Remote Banks](#sync-remote-banks)
     - [Loan Interest Calculator](#loan-interest-calculator)
     - [Tracking Home Prices (RentCast's Value Estimate)](#tracking-home-prices-rentcasts-value-estimate)
+    - [Tracking Home Prices (TerraScoutX's County Appraised Value)](#tracking-home-prices-terrascoutxs-county-appraised-value)
     - [Tracking Home Prices (Zillow's Zestimate)](#tracking-home-prices-zillows-zestimate)
     - [Tracking Vehicle Prices (Kelley Blue Book)](#tracking-vehicle-prices-kelley-blue-book)
     - [Tracking Investment Accounts](#tracking-investment-accounts)
     - [Tracking Bitcoin Price](#tracking-bitcoin-price)
+    - [Tracking Crypto Prices](#tracking-crypto-prices)
+    - [Tracking Precious Metals (Gold & Silver)](#tracking-precious-metals-gold--silver)
+
+NOTE: these scripts ignore any account that is closed.
 
 ## Requirements
 
@@ -70,6 +75,10 @@ BITCOIN_PAYEE_NAME="Bitcoin Price Change"
 #optional, RentCast API key for fetching property data
 RENTCAST_API_KEY="<Rentcast API key>"
 RENTCAST_PAYEE_NAME="RentCast"
+
+# optional, TerraScoutX API key for fetching county property values
+TERRASCOUTX_API_KEY="<TerraScoutX API key>"
+TERRASCOUTX_PAYEE_NAME="TerraScoutX"
 ```
 
 ### OIDC Auth Provider Support
@@ -185,7 +194,9 @@ interest transaction on the 28th of the month, set the account note to
 By default, interest is calculated using the 30/360 method where interest is
 computed monthly using 30/360 (or 1/12) of the interest rate.  If you need to
 compute interest using the ACTUAL/ACTUAL method, set `interest:actual` in the
-note.  If you need to compute interest daily, set `interest:daily`.
+note.  If you need to compute interest daily, set `interest:daily`.  For most
+student loans, you probably want simple dailiy interest
+`interest:daily-simple`.
 
 You can optionally change the payee used for the interest transactions by
 setting `INTEREST_PAYEE_NAME` in the `.env` file.
@@ -243,6 +254,53 @@ To run:
 
 ```console
 node rentcast.js
+```
+
+It is recommended to run this script once per month.
+
+### Tracking Home Prices (TerraScoutX's County Appraised Value)
+
+This script tracks the county appraised value for a home, using the
+[TerraScoutX](https://terrascoutx.com) property API.  It adds new transactions
+to keep the account balance equal to the latest value.
+
+You will need a free API key from https://terrascoutx.com/developers/ (sign in,
+then create a key).  Each key gets 2,000 requests per month at no charge, and
+the script uses one request per account each time it runs.  Copy your API key
+into the `TERRASCOUTX_API_KEY` setting in the `.env` file.
+
+Note that this is not a market estimate like a Zestimate or RentCast's value.
+It is the market value the county assessor or appraisal district set for its
+latest tax roll, so it lags the market and typically updates once a year.  In
+states that cap assessment increases (e.g. California under Prop 13) it can be
+well below what the home would sell for.  Coverage is US only and varies by
+county.
+
+To use this script, you need to create a new account in Actual Budget and set
+the account note to `terrascoutx:<address>`.  The address needs to be one line
+with commas separating the address lines, then URL encoded, an online encoder
+like https://www.urlencoder.org/ is helpful.
+
+Example note using address "1000 Main St, Houston, TX 77002":
+```
+terrascoutx:1000%20Main%20St%2C%20Houston%2C%20TX%2077002
+```
+
+The script uses the best match for the address and prints the property it
+matched, so check the output the first time you run it.
+
+Optionally, you can also specify if you only own a portion of the home by
+adding an `ownership:0.0X` tag to the account note.  For example, if you own
+10% of the home, add `ownership:0.10` to the account note.  The script will
+then use that percentage to track the home's value.
+
+You can optionally change the payee used for the transactions by setting
+`TERRASCOUTX_PAYEE_NAME` in the `.env` file.
+
+To run:
+
+```console
+node terrascoutx.js
 ```
 
 It is recommended to run this script once per month.
@@ -447,3 +505,47 @@ node sync-crypto.js
 It is recommended to run this script once per day or week. If you are retrieving
 BTC prices using this script, DO NOT run the `sync-bitcoin.js` script as well, as it will
 set the account balance to the value of your BTC holdings only.
+
+### Tracking Precious Metals (Gold & Silver)
+
+This script tracks the value of physical gold and silver holdings. Similar to
+the Bitcoin and Crypto scripts, it adds new transactions to keep the account
+balance equal to the latest market value.
+
+To use, set one or both of these tags in the account notes, where the value is
+the quantity in **troy ounces** that you own:
+
+- `GOLD:X` - troy ounces of gold (e.g. `GOLD:2.5`)
+- `SILVER:X` - troy ounces of silver (e.g. `SILVER:50`)
+
+Both tags may be set on the same account; the script will sum their values into
+a single correcting transaction. Accounts without either tag are skipped.
+
+For example, an account holding 1 oz of gold and 100 oz of silver would have
+this account note:
+
+```
+GOLD:1
+SILVER:100
+```
+
+Spot prices are retrieved from [gold-api.com](https://gold-api.com/) by default
+(USD per troy ounce, no API key required). To use a different price source,
+override the URL and JSON path per metal in your `.env` file. For example, to
+fetch gold in GBP from an alternate provider:
+
+```shell
+GOLD_PRICE_URL="https://example.com/api/gold/gbp"
+GOLD_PRICE_JSON_PATH="data.price"
+```
+
+You can optionally change the payee used for the transactions by setting
+`METALS_PAYEE_NAME` in the `.env` file.
+
+To run:
+
+```console
+node sync-metals.js
+```
+
+It is recommended to run this script once per day or week.
