@@ -549,3 +549,10 @@ node sync-metals.js
 ```
 
 It is recommended to run this script once per day or week.
+
+
+## Homelab scheduled runtime
+
+The default container runs one requested helper and exits. The API client and server version are both pinned to Actual 26.11.0. `ACTUAL_SERVER_VERSION` is required and a mismatch fails before connection. TLS validation stays enabled. The wrapper reports the script step and retries recognized transient network errors.
+
+The default image uses Node only. Chrome and Selenium are in the optional amd64 `browser` target for Zillow support. Build the default image from the lockfile, then run `sync-banks.js` with the existing secret environment. Do not put `.env`, cache files, or bank credentials in Git or the build context.
