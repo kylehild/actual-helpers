@@ -22,17 +22,27 @@ jobs:
 
       - name: Fetch release version
         run: |
-          curl -sL https://api.github.com/repos/actualbudget/actual/releases/latest | \
-          jq -r ".tag_name" > actual-latest.txt
+          set -euo pipefail
+          curl -fsSL https://api.github.com/repos/actualbudget/actual/releases/latest | \
+          jq -er '.tag_name' > actual-latest.txt
+
+      - name: Pin helper API to the release
+        run: node scripts/sync-actual-version.js
 
       - name: Check for modified files
         id: git-check
-        run: echo ::set-output name=modified::$([ -z "`git status --porcelain`" ] && echo "false" || echo "true")
+        run: |
+          if git diff --quiet -- actual-latest.txt package.json package-lock.json; then
+            echo "modified=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "modified=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Commit latest release version
         if: steps.git-check.outputs.modified == 'true'
         run: |
-          git config --global user.name 'Robert Dyer'
-          git config --global user.email 'rdyer@unl.edu'
-          git commit -am "New Actual release version"
+          git config user.name 'actual-helpers release updater'
+          git config user.email 'actual-helpers-release-updater@users.noreply.github.com'
+          git add actual-latest.txt package.json package-lock.json
+          git commit -m "chore: pin Actual API to $(cat actual-latest.txt)"
           git push
