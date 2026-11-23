@@ -41,7 +41,8 @@ jobs:
           UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
         run: |
           branch="automation/upstream-$UPSTREAM_COMMIT"
-          existing=$(gh pr list --base main --head "$branch" --state all --json number --jq 'length')
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --state all --json isCrossRepository --jq 'map(select(.isCrossRepository | not)) | length')
           if [ "$existing" = 0 ]; then
             echo "branch=$branch" >> "$GITHUB_OUTPUT"
           fi
@@ -71,7 +72,7 @@ jobs:
               exit 1
             fi
           fi
-          gh workflow run publish.yml --ref "$SYNC_BRANCH"
-          gh pr create --base main --head "$SYNC_BRANCH" \
+          gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$SYNC_BRANCH" \
             --title "Sync upstream Actual helpers (${UPSTREAM_COMMIT:0:12})" \
             --body "Merges psybers/actual-helpers@$UPSTREAM_COMMIT and updates the exact Actual API pin and lockfile together. Use Create a merge commit to preserve upstream ancestry."
