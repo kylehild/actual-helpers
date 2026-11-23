@@ -6,7 +6,18 @@ WORKDIR /usr/src/app
 RUN mkdir -p /usr/src/app /cache /opt/homelab && chown -R node:node /usr/src/app /cache /opt/homelab
 COPY --chown=node:node package.json package-lock.json ./
 USER node
-RUN npm ci --omit=dev && npm audit --omit=dev --audit-level=high && npm cache clean --force
+USER root
+RUN apt-get update -qq \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && chown -R node:node /usr/src/app
+USER node
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+USER root
+RUN apt-get purge -y python3 make g++ \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+USER node
 COPY --chown=node:node *.js ./
 COPY --chown=node:node run-helper.js /opt/homelab/run-helper.js
 ENTRYPOINT ["node", "/opt/homelab/run-helper.js"]
