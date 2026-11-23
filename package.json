@@ -1,10 +1,24 @@
 {
   "dependencies": {
-    "@actual-app/api": "latest",
-    "chromedriver": "^131.0.4",
+    "@actual-app/api": "26.11.0",
     "dotenv": "^16.4.5",
     "jsdom": "^24.1.0",
     "readline-sync": "^1.4.10",
     "selenium-webdriver": "^4.27.0"
+  },
+  "name": "actual-helpers",
+  "private": true,
+  "version": "26.11.0",
+  "imageRevision": 2,
+  "overrides": {
+    "adm-zip": "0.6.1",
+    "axios": "1.20.0",
+    "form-data": "4.0.6",
+    "ip-address": "10.7.6",
+    "tmp": "0.2.7",
+    "ws": "8.22.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
   }
 }

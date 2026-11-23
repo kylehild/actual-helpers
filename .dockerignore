@@ -1,7 +1,11 @@
 .git/
+.github/
 .idea/
 .vscode/
-.github/
-.gitignore
 node_modules/
-package-lock.json
+.env
+.env.*
+simplefin.credentials
+cache/
+logs/
+*.log

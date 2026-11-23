@@ -1,95 +1,41 @@
-# Use an official Node.js runtime as a parent image
-FROM node:22
+FROM node:22-bookworm-slim AS runtime
+LABEL org.opencontainers.image.source="https://github.com/kylehild/actual-helpers"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+ENV NODE_ENV=production NODE_TLS_REJECT_UNAUTHORIZED=1 ACTUAL_HELPER_APP_DIR=/usr/src/app ACTUAL_HELPER_RETRY_DELAYS=60,300,900 ACTUAL_CACHE_DIR=/cache
+WORKDIR /usr/src/app
+RUN mkdir -p /usr/src/app /cache /opt/homelab && chown -R node:node /usr/src/app /cache /opt/homelab
+COPY --chown=node:node package.json package-lock.json ./
+USER node
+USER root
+RUN apt-get update -qq \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && chown -R node:node /usr/src/app
+USER node
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+USER root
+RUN apt-get purge -y python3 make g++ \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+USER node
+COPY --chown=node:node *.js ./
+COPY --chown=node:node run-helper.js /opt/homelab/run-helper.js
+ENTRYPOINT ["node", "/opt/homelab/run-helper.js"]
+CMD ["sync-banks.js"]
 
-RUN apt-get update -qq -y && \
-    apt-get install -y \
-        libasound2 \
-        libatk-bridge2.0-0 \
-        libgtk-4-1 \
-        libnss3 \
-        xdg-utils \
-        wget && \
-    wget -q -O chrome-linux64.zip https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.204/linux64/chrome-linux64.zip && \
-    unzip chrome-linux64.zip && \
-    rm chrome-linux64.zip && \
-    mv chrome-linux64 /opt/chrome/ && \
-    ln -s /opt/chrome/chrome /usr/local/bin/ && \
-    wget -q -O chromedriver-linux64.zip https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.204/linux64/chromedriver-linux64.zip && \
-    unzip -j chromedriver-linux64.zip chromedriver-linux64/chromedriver && \
-    rm chromedriver-linux64.zip && \
-    mv chromedriver /usr/local/bin/
-
-# Don't run as root
+# Zillow/Selenium support is optional. The scheduled helpers do not need Chrome.
+FROM runtime AS browser
+USER root
+ARG CHROME_VERSION
+RUN test -n "$CHROME_VERSION" && test "$(uname -m)" = x86_64 \
+    && apt-get update -qq \
+    && apt-get install -y --no-install-recommends ca-certificates wget unzip libasound2 libatk-bridge2.0-0 libgtk-4-1 libnss3 xdg-utils \
+    && wget -q -O /tmp/chrome.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-linux64.zip" \
+    && unzip -q /tmp/chrome.zip -d /opt \
+    && ln -s /opt/chrome-linux64/chrome /usr/local/bin/chrome \
+    && wget -q -O /tmp/driver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" \
+    && unzip -j /tmp/driver.zip chromedriver-linux64/chromedriver -d /usr/local/bin \
+    && rm -rf /var/lib/apt/lists/* /tmp/chrome.zip /tmp/driver.zip
 USER node
 
-# Set the working directory in the container
-WORKDIR /usr/src/app
-
-# Create the cache directory
-RUN mkdir -p ./cache && chown node:node ./cache
-
-# Define environment variables
-ENV NODE_ENV=production
-
-ENV ACTUAL_SERVER_URL=""
-ENV ACTUAL_SERVER_PASSWORD=""
-ENV ACTUAL_SYNC_ID=""
-# allow self-signed SSL certs
-ENV NODE_TLS_REJECT_UNAUTHORIZED=0
-
-# needed for Selenium+chromedriver
-ENV CHROMEDRIVER_SKIP_DOWNLOAD=true
-
-# optional, for encrypted files
-ENV ACTUAL_FILE_PASSWORD=""
-
-# optional, if you want to use a different cache directory
-ENV ACTUAL_CACHE_DIR="./cache"
-
-# optional, name of the payee for added interest transactions
-ENV INTEREST_PAYEE_NAME="Loan Interest"
-
-# optional, name of the payee for added investment transactions
-ENV INVESTMENT_PAYEE_NAME="Investment"
-# optional, name of the category group for added investment tracking transactions
-ENV INVESTMENT_CATEGORY_GROUP_NAME="Income"
-# optional, name of the category for added investment tracking transactions
-ENV INVESTMENT_CATEGORY_NAME="Investment"
-
-# optional, for logging into SimpleFIN
-ENV SIMPLEFIN_CREDENTIALS=""
-
-# optional, name of the payee for Zestimate entries
-ENV ZESTIMATE_PAYEE_NAME="Zestimate"
-
-# optional, name of the payee for KBB entries
-ENV KBB_PAYEE_NAME="KBB"
-
-# optional, for retrieving Bitcoin Price (these default to Kraken USD)
-ENV BITCOIN_PRICE_URL="https://api.kraken.com/0/public/Ticker?pair=xbtusd"
-ENV BITCOIN_PRICE_JSON_PATH="result.XXBTZUSD.c[0]"
-ENV BITCOIN_PAYEE_NAME="Bitcoin Price Change"
-
-# optional, for retrieving precious metals prices (these default to gold-api.com USD/troy oz)
-ENV GOLD_PRICE_URL="https://api.gold-api.com/price/XAU"
-ENV GOLD_PRICE_JSON_PATH="price"
-ENV SILVER_PRICE_URL="https://api.gold-api.com/price/XAG"
-ENV SILVER_PRICE_JSON_PATH="price"
-ENV METALS_PAYEE_NAME="Metals Price Change"
-
-#optional, RentCast API key for fetching property data
-ENV RENTCAST_API_KEY=""
-ENV RENTCAST_PAYEE_NAME="RentCast"
-
-# optional, TerraScoutX API key for fetching county property values
-ENV TERRASCOUTX_API_KEY=""
-ENV TERRASCOUTX_PAYEE_NAME="TerraScoutX"
-
-# Copy the current directory contents into the container at /usr/src/app
-COPY --chown=node:node . .
-
-# Install any needed packages specified in package.json
-RUN npm install && npm update
-
-# Run the app when the container launches
-ENTRYPOINT ["tail", "-f", "/dev/null"]
+FROM runtime AS default

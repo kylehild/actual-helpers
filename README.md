@@ -549,3 +549,28 @@ node sync-metals.js
 ```
 
 It is recommended to run this script once per day or week.
+
+
+## Homelab scheduled runtime
+
+The default container runs one requested helper and exits. The API client and server version are both pinned to Actual 26.11.0. `ACTUAL_SERVER_VERSION` is required and a mismatch fails before connection. TLS validation stays enabled. The wrapper reports the script step and retries recognized transient network errors.
+
+### Syncing the fork
+
+The **Sync upstream Actual helpers** workflow checks `psybers/actual-helpers:main`
+every six hours and can also run on demand. When it finds a new upstream commit,
+it merges it into a review branch, uses `actual-latest.txt` to update the exact API
+pin and npm lockfile, and starts image validation. It opens one PR per upstream
+tip. Use **Create a merge commit** after review to preserve upstream ancestry.
+If several proposals are open, review the newest one first.
+
+GitHub Actions must be allowed to create pull requests in this repository.
+The workflow uses the repository's built-in token. GitHub may separately ask
+for approval on the PR-triggered check. The workflow also dispatches a validation
+run directly on the sync branch, and publishing runs only on `main`.
+
+To prepare the same merge locally, run `bash scripts/sync-upstream.sh` from a
+clean topic branch based on the fork's `main`. The script creates a local merge
+commit and stops on conflicts or upstream changes under `.github`.
+
+The default image uses Node only. Chrome and Selenium are in the optional amd64 `browser` target for Zillow support. Build the default image from the lockfile, then run `sync-banks.js` with the existing secret environment. Do not put `.env`, cache files, or bank credentials in Git or the build context.

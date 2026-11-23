@@ -1,0 +1,78 @@
+name: Sync upstream Actual helpers
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: actual-helpers-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'kylehild/actual-helpers' && !github.event.repository.private && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Find upstream changes
+        id: upstream
+        run: |
+          git fetch --no-tags https://github.com/psybers/actual-helpers.git refs/heads/main
+          upstream=$(git rev-parse FETCH_HEAD)
+          if ! git merge-base --is-ancestor "$upstream" HEAD; then
+            echo "commit=$upstream" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Find existing sync
+        id: proposal
+        if: steps.upstream.outputs.commit != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
+        run: |
+          branch="automation/upstream-$UPSTREAM_COMMIT"
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --state all --json isCrossRepository --jq 'map(select(.isCrossRepository | not)) | length')
+          if [ "$existing" = 0 ]; then
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Merge and pin the upstream release
+        if: steps.proposal.outputs.branch != ''
+        env:
+          UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          bash scripts/sync-upstream.sh "$UPSTREAM_COMMIT"
+      - name: Push review branch and request validation
+        if: steps.proposal.outputs.branch != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SYNC_BRANCH: ${{ steps.proposal.outputs.branch }}
+          UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
+        run: |
+          gh auth setup-git
+          remote_tip=$(git ls-remote origin "refs/heads/$SYNC_BRANCH" | cut -f1)
+          if [ -z "$remote_tip" ]; then
+            git push origin "HEAD:refs/heads/$SYNC_BRANCH"
+          else
+            git fetch --no-tags origin "refs/heads/$SYNC_BRANCH"
+            if [ "$(git rev-parse FETCH_HEAD^2)" != "$UPSTREAM_COMMIT" ]; then
+              echo "Existing sync branch has unexpected ancestry." >&2
+              exit 1
+            fi
+          fi
+          gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$SYNC_BRANCH" \
+            --title "Sync upstream Actual helpers (${UPSTREAM_COMMIT:0:12})" \
+            --body "Merges psybers/actual-helpers@$UPSTREAM_COMMIT and updates the exact Actual API pin and lockfile together. Use Create a merge commit to preserve upstream ancestry."
