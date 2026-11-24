@@ -9,7 +9,7 @@
   "name": "actual-helpers",
   "private": true,
   "version": "26.11.0",
-  "imageRevision": 2,
+  "imageRevision": 3,
   "overrides": {
     "adm-zip": "0.6.1",
     "axios": "1.20.0",

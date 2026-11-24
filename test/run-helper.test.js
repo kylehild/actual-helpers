@@ -33,6 +33,13 @@ test('classifies network and provider failures as transient', () => {
   assert.equal(classifyFailure('HTTP 503 Service Unavailable'), 'transient');
 });
 
+test('retries an Actual login network failure and stops on credential errors', () => {
+  assert.equal(classifyFailure('Error: Authentication failed: network-failure'), 'transient');
+  assert.equal(classifyFailure('Error: Authentication failed: invalid-password'), 'permanent');
+  assert.equal(classifyFailure('Error: Authentication failed: unauthorized'), 'permanent');
+  assert.equal(classifyFailure('Error: Authentication failed: unknown error'), 'permanent');
+});
+
 test('fails unknown errors without retrying', () => {
   assert.equal(classifyFailure('Error: unexpected data shape'), 'unknown');
 });

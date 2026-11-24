@@ -10,8 +10,7 @@ const PERMANENT_PATTERNS = [
   /out-of-sync-migrations/i,
   /cannot be loaded with this version/i,
   /required settings .* not provided/i,
-  /invalid password/i,
-  /authentication failed/i,
+  /invalid[- ]password/i,
   /unauthorized/i,
   /forbidden/i,
   /version mismatch/i,
@@ -36,6 +35,13 @@ function versionsMatch(helperVersion, serverVersion) {
 
 function classifyFailure(output) {
   if (PERMANENT_PATTERNS.some(pattern => pattern.test(output))) {
+    return 'permanent';
+  }
+  // Actual's login request wraps network errors in an authentication message.
+  if (/authentication failed:\s*network-failure\b/i.test(output)) {
+    return 'transient';
+  }
+  if (/authentication failed/i.test(output)) {
     return 'permanent';
   }
   if (TRANSIENT_PATTERNS.some(pattern => pattern.test(output))) {
